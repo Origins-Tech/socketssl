@@ -17,7 +17,9 @@ def async_input(stop_event: Event, prompt: str = "") -> str | None:
     print(prompt, end='', flush=True)
     while not stop_event.is_set():
         if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
-            return sys.stdin.readline().strip()
+            if (text := sys.stdin.readline().strip()) == "[DISCONNECT]":
+                return text.__repr__()
+            return text
 
 
 class PeekableQueue(Queue):
