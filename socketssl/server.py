@@ -45,7 +45,7 @@ class Server:
 
     def _handle_client_send(self, client: socket.socket, client_shutdown: Event, name: str) -> None:
         while not (self.shutdown.is_set() or client_shutdown.is_set()):
-            if self.queue.peek() and self.queue.peek()[0] == name:
+            if (item := self.queue.peek()) and item[0] == name:
                 self._send(client, self.queue.get()[1])
 
     def _handle_client_receive(self, client: socket.socket, addr, client_shutdown: Event, next_: str) -> None:
