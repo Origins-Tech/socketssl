@@ -73,7 +73,7 @@ class Server:
                     for i, name in enumerate(self.data_flow):
                         if data.get("name") == name and role == (len(self.data_flow) + i) % 3:
                             client.send("1".encode())
-                            return Role(role), name, self.data_flow[i + 1] if i < len(self.data_flow) else None
+                            return Role(role), name, self.data_flow[i + 1] if i < len(self.data_flow) - 1 else None
                 else:
                     pos = self.data_flow.index(data.get("name"))
                     if pos == 0 and role == 0:
