@@ -1,18 +1,33 @@
-import json
-import socket
-from threading import Thread, Event
+from __future__ import annotations
 
-from .util import HEADER, Role, PeekableQueue
+import socket
+from threading import Thread
+
+from .util import HEADER, Payload
 
 
 class Server:
-    def __init__(self, *, host: str, port: int, num_clients: int, data_flow: list[str]):
-        if len(data_flow) < 2:
-            raise Exception("Data flow needs at least 2 elements.")
-        self.data_flow = data_flow
-        self.queue = PeekableQueue()
-        self.clients = []
-        self.shutdown = Event()
+    class _Client:
+        def __init__(self, client: socket.socket, name: str):
+            self._client = client
+            self.name = name
+
+        def send(self, payload: Payload):
+            payload = payload.model_dump_json().encode()
+            send_length = str(len(payload)).encode()
+            send_length += b' ' * (HEADER - len(send_length))
+            self._client.send(send_length)
+            self._client.send(payload)
+
+        def receive(self, bufsize: int) -> str:
+            return self._client.recv(bufsize).decode()
+
+        def close(self):
+            self._client.close()
+
+    def __init__(self, *, host: str, port: int, num_clients: int = None):
+        self.clients: list[Server._Client] = []
+        self.name = "SERVER"
 
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -22,66 +37,44 @@ class Server:
 
         try:
             while True:
-                if len(self.clients) < num_clients:
-                    client, addr = server.accept()
-                    role, name, next_ = self._validate_role(client)
-                    if role is not None:
-                        client_shutdown = Event()
-                        Thread(target=self._handle_client_send, args=(client, client_shutdown, name)).start()
-                        Thread(target=self._handle_client_receive, args=(client, addr, client_shutdown, next_)).start()
+                if num_clients is None or len(self.clients) < num_clients:
+                    client_socket, addr = server.accept()
+                    name = self._get_name(client_socket)
+                    if name:
+                        client = Server._Client(client_socket, name)
+                        Thread(target=self._handle_client, args=(client, addr)).start()
                         print(f"[SERVER] '{addr[0]}:{addr[1]}' connected")
                         self.clients.append(client)
+                    else:
+                        client_socket.close()
         except KeyboardInterrupt:
-            self.shutdown.set()
             for client in self.clients:
-                self._send(client, '[DISCONNECT]')
+                client.send(Payload(source=self.name, destination=client.name, data='[DISCONNECT]'))
 
-    @staticmethod
-    def _send(client: socket.socket, message: str) -> None:
-        send_length = str(len(message.encode())).encode()
-        send_length += b' ' * (HEADER - len(send_length))
-        client.send(send_length)
-        client.send(message.encode())
-
-    def _handle_client_send(self, client: socket.socket, client_shutdown: Event, name: str) -> None:
-        while not (self.shutdown.is_set() or client_shutdown.is_set()):
-            if (item := self.queue.peek()) and item[0] == name:
-                self._send(client, self.queue.get()[1])
-
-    def _handle_client_receive(self, client: socket.socket, addr, client_shutdown: Event, next_: str) -> None:
+    def _handle_client(self, client: Server._Client, addr) -> None:
         while True:
-            msg_length = client.recv(HEADER).decode()
-            if msg_length:
-                message = client.recv(int(msg_length)).decode()
-                if message == '[DISCONNECT]':
-                    self._send(client, message)
+            recv_length = client.receive(HEADER)
+            if recv_length:
+                payload = Payload.model_validate_json(client.receive(int(recv_length)))
+                if payload.data == '[DISCONNECT]':
+                    client.send(Payload(source=self.name, destination=payload.source, data=payload.data))
                     break
-                self.queue.put((next_, message))
+                destination = next((client_ for client_ in self.clients if client_.name == payload.destination), None)
+                if destination: destination.send(payload)
 
-        client_shutdown.set()
         self.clients.remove(client)
         client.close()
         print(f"[SERVER] '{addr[0]}:{addr[1]}' disconnected")
 
-    def _validate_role(self, client: socket.socket) -> (Role, str, str):
+    def _get_name(self, client: socket.socket) -> str:
         while True:
-            data_length = client.recv(HEADER).decode()
-            if data_length:
-                data: dict = json.loads(client.recv(int(data_length)).decode())
-                role = data.get("role")
-                if len(self.data_flow) > 2:
-                    for i, name in enumerate(self.data_flow):
-                        if data.get("name") == name and role == (len(self.data_flow) + i) % 3:
-                            client.send("1".encode())
-                            return Role(role), name, self.data_flow[i + 1] if i < len(self.data_flow) - 1 else None
-                else:
-                    pos = self.data_flow.index(data.get("name"))
-                    if pos == 0 and role == 0:
-                        client.send("1".encode())
-                        return Role(role), data.get("name"), self.data_flow[1]
-                    elif pos == 1 and role == 2:
-                        client.send("1".encode())
-                        return Role(role), data.get("name"), None
+            recv_length = client.recv(HEADER).decode()
+            if recv_length:
+                payload = Payload.model_validate_json(client.recv(int(recv_length)))
+                duplicate = next((client for client in self.clients if client.name == payload.data), None)
+                if not duplicate and payload.data != self.name:
+                    client.send("1".encode())
+                    return payload.data
+                client.send("0".encode())
+                client.close()
                 break
-        client.send("0".encode())
-        client.close()
