@@ -1,9 +1,11 @@
+import logging
 import socket
 from threading import Event, Thread
 from typing import Callable
 
 from .util import HEADER, Payload, Response
 
+logger = logging.getLogger(__name__)
 
 class Client:
 
@@ -15,11 +17,11 @@ class Client:
         self._callback = callback
         self._client.connect((host, port))
         if self._has_valid_name():
-            print(f"Connected to '{host}:{port}'...")
+            logger.info(f"Connected to '{host}:{port}'")
             Thread(target=self._receive).start()
         else:
             self._client.close()
-            raise Exception(f"Name '{self.name}' cannot be used as it is already taken or 'SERVER'.")
+            raise Exception(f"Name '{self.name}' cannot be used as it is already taken'.")
 
     def send(self, destination: str, message: str) -> None:
         if not self._disconnect_event.is_set():

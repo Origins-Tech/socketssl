@@ -1,5 +1,9 @@
+from .logger import setup_logging
+
+setup_logging()
+
 from .client import Client
 from .server import Server
-from .util import async_input, Response
+from .util import Response, async_input
 
-__all__ = ["Client", "Server", "async_input", "Response"]
+__all__ = ["Client", "Server", "Response", "async_input"]

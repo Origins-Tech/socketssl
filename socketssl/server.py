@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
 import socket
 from threading import Thread
 
 from .util import HEADER, Payload
+
+logger = logging.getLogger(__name__)
 
 
 class Server:
@@ -25,15 +28,15 @@ class Server:
         def close(self):
             self._client.close()
 
-    def __init__(self, *, host: str, port: int, num_clients: int = None):
+    def __init__(self, *, host: str, port: int, num_clients: int = None, name: str = "SERVER"):
         self.clients: list[Server._Client] = []
-        self.name = "SERVER"
+        self.name = name
 
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         server.bind((host, port))
         server.listen()
-        print(f"[SERVER] Listening on '{host}:{port}'...")
+        logger.info(f"Listening on '{host}:{port}'...")
 
         try:
             while True:
@@ -43,7 +46,7 @@ class Server:
                     if name:
                         client = Server._Client(client_socket, name)
                         Thread(target=self._handle_client, args=(client, addr)).start()
-                        print(f"[SERVER] '{addr[0]}:{addr[1]}' connected")
+                        logger.info(f"Client '{addr[0]}:{addr[1]}' connected")
                         self.clients.append(client)
                     else:
                         client_socket.close()
@@ -60,11 +63,13 @@ class Server:
                     client.send(Payload(source=self.name, destination=payload.source, data=payload.data))
                     break
                 destination = next((client_ for client_ in self.clients if client_.name == payload.destination), None)
-                if destination: destination.send(payload)
+                if destination:
+                    destination.send(payload)
+                    logger.info(f"Forwarded data from {client.name} to {destination.name}")
 
         self.clients.remove(client)
         client.close()
-        print(f"[SERVER] '{addr[0]}:{addr[1]}' disconnected")
+        logger.info(f"Client '{addr[0]}:{addr[1]}' disconnected")
 
     def _get_name(self, client: socket.socket) -> str:
         while True:
