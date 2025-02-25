@@ -22,7 +22,7 @@ class Client:
             Thread(target=self._receive).start()
         else:
             self._client.close()
-            raise Exception(f"Name '{self.name}' cannot be used as it is already taken'.")
+            raise Exception(f"Name '{self.name}' cannot be used as it is already taken.")
 
     def send(self, destination: str, message: str) -> None:
         if not self._disconnect_event.is_set():
