@@ -3,7 +3,7 @@ A wrapper around the python socket library for easy streamlined use.
 
 ## Installation
 ```bash
-pip install socketssl
+pip install git+https://github.com/Origins-Tech/socketssl.git
 ```
 
 ## Usage
