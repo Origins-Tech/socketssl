@@ -4,3 +4,5 @@ from .server import Server
 from .util import Response, async_input
 
 __all__ = ["Client", "Server", "Response", "async_input"]
+
+__version__ = "1.1.1"
