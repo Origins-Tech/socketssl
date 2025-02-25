@@ -7,6 +7,7 @@ from .util import HEADER, Payload, Response
 
 logger = logging.getLogger(__name__)
 
+
 class Client:
 
     def __init__(self, *, host: str, port: int, name: str, disconnect_event: Event,

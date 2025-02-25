@@ -1,7 +1,4 @@
-from .logger import setup_logging
-
-setup_logging()
-
+from . import logger
 from .client import Client
 from .server import Server
 from .util import Response, async_input
