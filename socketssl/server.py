@@ -44,14 +44,16 @@ class Server:
                     client_socket, addr = server.accept()
                     name, is_duplicate = self._get_name(client_socket)
                     if is_duplicate:
-                        logger.warning(f"Client '{addr[0]}:{addr[1]}' connection blocked: Name '{name}' already taken")
+                        logger.info(f"Client '{addr[0]}:{addr[1]}' connection blocked: Name '{name}' already taken")
                         client_socket.close()
-                    else:
-                        client = Server._Client(client_socket, name)
-                        Thread(target=self._handle_client, args=(client, addr)).start()
-                        logger.info(f"'{name}' with '{addr[0]}:{addr[1]}' connected")
-                        self.clients.append(client)
-        except KeyboardInterrupt:
+                        continue
+                    client = Server._Client(client_socket, name)
+                    Thread(target=self._handle_client, args=(client, addr)).start()
+                    logger.info(f"'{name}' with '{addr[0]}:{addr[1]}' connected")
+                    self.clients.append(client)
+                    if len(self.clients) == num_clients:
+                        logger.info(f"Maximum number of clients reached: {num_clients} - Won't accept more clients")
+        finally:
             for client in self.clients:
                 client.send(Payload(source=self.name, destination=client.name, data='[DISCONNECT]'))
 

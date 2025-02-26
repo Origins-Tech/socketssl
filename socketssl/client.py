@@ -16,13 +16,16 @@ class Client:
         self.name = name
         self._disconnect_event = disconnect_event
         self._callback = callback
-        self._client.connect((host, port))
+        try:
+            self._client.connect((host, port))
+        except ConnectionRefusedError:
+            raise ConnectionRefusedError(f"Could not connect to '{host}:{port}' - Is the server running?")
         if self._has_valid_name():
             logger.info(f"Connected to '{host}:{port}'")
             Thread(target=self._receive).start()
         else:
             self._client.close()
-            raise Exception(f"Name '{self.name}' cannot be used as it is already taken.")
+            raise ConnectionRefusedError(f"Name '{self.name}' cannot be used as it is already taken.")
 
     def send(self, destination: str, message: str) -> None:
         if not self._disconnect_event.is_set():
